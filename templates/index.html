@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Similarity</title>
+</head>
+<body>
+    <h1>Face Similarity Checker</h1>
+    <form id="faceForm">
+        <label for="image1">Upload First Image:</label>
+        <input type="file" id="image1" name="image1" accept="image/*" required><br><br>
+        
+        <label for="image2">Upload Second Image:</label>
+        <input type="file" id="image2" name="image2" accept="image/*" required><br><br>
+        
+        <button type="submit">Compare Faces</button>
+    </form>
+
+    <h2 id="result"></h2>
+
+    <script>
+        document.getElementById('faceForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('image1', document.getElementById('image1').files[0]);
+            formData.append('image2', document.getElementById('image2').files[0]);
+
+            try {
+                const response = await fetch('/compare_faces', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    document.getElementById('result').textContent = `Error: ${errorData.error}`;
+                    return;
+                }
+
+                const data = await response.json();
+                document.getElementById('result').textContent = `Face Similarity: ${data.similarity}`;
+            } catch (error) {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
