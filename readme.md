@@ -1,6 +1,4 @@
-### `README.md`
 
-```markdown
 # Face Similarity Checker
 
 This project is a Flask-based web application that calculates the similarity between faces in two uploaded images using the `face_recognition` library.
