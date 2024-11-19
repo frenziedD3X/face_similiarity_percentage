@@ -3,48 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Similarity</title>
+    <title>Real-Time Face Comparison</title>
 </head>
 <body>
-    <h1>Face Similarity Checker</h1>
-    <form id="faceForm">
-        <label for="image1">Upload First Image:</label>
-        <input type="file" id="image1" name="image1" accept="image/*" required><br><br>
-        
-        <label for="image2">Upload Second Image:</label>
-        <input type="file" id="image2" name="image2" accept="image/*" required><br><br>
-        
-        <button type="submit">Compare Faces</button>
+    <h1>Real-Time Face Comparison</h1>
+
+    <form id="image-upload-form" enctype="multipart/form-data">
+        <label for="image1">Upload Reference Image:</label>
+        <input type="file" id="image1" name="image1" required>
+        <button type="submit">Upload and Start</button>
     </form>
 
-    <h2 id="result"></h2>
+    <video id="webcam" autoplay width="320" height="240" style="display: none;"></video>
+    <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
+
+    <button id="stop-button" style="display: none;">Stop</button>
+
+    <p id="result">Similarity: Waiting for frames...</p>
 
     <script>
-        document.getElementById('faceForm').addEventListener('submit', async function (event) {
-            event.preventDefault();
-            
-            const formData = new FormData();
-            formData.append('image1', document.getElementById('image1').files[0]);
-            formData.append('image2', document.getElementById('image2').files[0]);
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const result = document.getElementById('result');
+        const form = document.getElementById('image-upload-form');
+        const stopButton = document.getElementById('stop-button');
+        let isProcessing = false;
 
-            try {
-                const response = await fetch('/compare_faces', {
-                    method: 'POST',
-                    body: formData
-                });
+        // Access webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error('Error accessing webcam:', err);
+            });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    document.getElementById('result').textContent = `Error: ${errorData.error}`;
-                    return;
-                }
+        // Start processing frames after reference image upload
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
 
-                const data = await response.json();
-                document.getElementById('result').textContent = `Face Similarity: ${data.similarity}`;
-            } catch (error) {
-                document.getElementById('result').textContent = `Error: ${error.message}`;
+            // Upload the reference image
+            const formData = new FormData(form);
+            const response = await fetch('/upload_reference_image', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                alert('Reference image uploaded. Starting real-time comparison...');
+                isProcessing = true;
+                stopButton.style.display = 'inline-block'; // Show the Stop button
+                startProcessingFrames();
+            } else {
+                const error = await response.json();
+                alert(`Error: ${error.error}`);
             }
         });
+
+        // Stop processing frames
+        stopButton.addEventListener('click', () => {
+            isProcessing = false;
+            stopButton.style.display = 'none'; // Hide the Stop button
+            result.textContent = 'Similarity: Stopped.';
+        });
+
+        // Send frames to the backend continuously
+        async function startProcessingFrames() {
+            const context = canvas.getContext('2d');
+
+            while (isProcessing) {
+                // Capture frame from webcam
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const frameData = canvas.toDataURL('image/png');
+
+                // Send frame to server for processing
+                const response = await fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frame: frameData })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    result.textContent = `Similarity: ${data.similarity}`;
+                } else {
+                    result.textContent = `Error: ${data.error}`;
+                }
+
+                // Small delay between frames to avoid overloading the server
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
     </script>
 </body>
 </html>
